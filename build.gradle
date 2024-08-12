@@ -1,0 +1,46 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+group 'com.stockmarket'
+version '1.0-SNAPSHOT'
+
+sourceCompatibility = 11
+targetCompatibility = 11
+
+repositories {
+    mavenCentral()
+}
+
+ext {
+    kafkaVersion = '3.2.0'
+    sparkVersion = '3.5.1'
+    slf4jVersion = '2.0.9'
+}
+
+dependencies {
+    implementation "org.apache.kafka:kafka-clients:${kafkaVersion}"
+    implementation "org.apache.kafka:kafka-streams:${kafkaVersion}"
+    implementation "org.apache.spark:spark-core_2.13:${sparkVersion}"
+    implementation "org.apache.spark:spark-sql_2.13:${sparkVersion}"
+    implementation "org.apache.spark:spark-streaming_2.13:${sparkVersion}"
+    implementation "org.apache.spark:spark-sql-kafka-0-10_2.13:${sparkVersion}"
+    implementation "org.slf4j:slf4j-api:${slf4jVersion}"
+    implementation "org.slf4j:slf4j-simple:${slf4jVersion}"
+    implementation 'org.json:json:20210307'
+    
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation "org.apache.kafka:kafka-clients:${kafkaVersion}:test"
+    testImplementation "org.apache.kafka:kafka_2.13:${kafkaVersion}:test"
+    testImplementation 'org.testcontainers:kafka:1.16.3'
+    testImplementation 'org.testcontainers:junit-jupiter:1.16.3'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+application {
+    mainClassName = 'com.stockmarket.App'
+}

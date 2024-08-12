@@ -1,57 +1,75 @@
-import org.apache.spark.SparkConf;
+package com.stockmarket;
+
+import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
-import org.apache.spark.sql.SparkSession;
-import org.apache.spark.streaming.Durations;
-import org.apache.spark.streaming.api.java.JavaDStream;
-import org.apache.spark.streaming.api.java.JavaInputDStream;
-import org.apache.spark.streaming.api.java.JavaStreamingContext;
-import org.apache.spark.streaming.kafka010.ConsumerStrategies;
-import org.apache.spark.streaming.kafka010.KafkaUtils;
-import org.apache.spark.streaming.kafka010.LocationStrategies;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.kafka.common.serialization.StringDeserializer;
+import org.apache.spark.sql.functions;
+import org.apache.spark.sql.types.*;
+import org.apache.spark.sql.streaming.StreamingQuery;
+import org.apache.spark.sql.streaming.StreamingQueryException;
 
-import java.util.*;
+import java.util.concurrent.TimeoutException;
 
 public class StockDataSparkJob {
-    public static void main(String[] args) throws InterruptedException {
-        SparkConf conf = new SparkConf().setAppName("StockDataSparkJob").setMaster("local[*]");
-        JavaStreamingContext jssc = new JavaStreamingContext(conf, Durations.seconds(1));
+    public static void main(String[] args) {
+        String bootstrapServers = args.length > 0 ? args[0] : "localhost:9092";
 
-        Map<String, Object> kafkaParams = new HashMap<>();
-        kafkaParams.put("bootstrap.servers", "localhost:9092");
-        kafkaParams.put("key.deserializer", StringDeserializer.class);
-        kafkaParams.put("value.deserializer", StringDeserializer.class);
-        kafkaParams.put("group.id", "spark-consumer-group");
-        kafkaParams.put("auto.offset.reset", "latest");
-        kafkaParams.put("enable.auto.commit", false);
+        SparkSession spark = SparkSession
+            .builder()
+            .appName("StockDataSparkJob")
+            .master("local[*]")
+            .getOrCreate();
 
-        Collection<String> topics = Arrays.asList("stock-data");
+        try {
+            // Read data from Kafka
+            Dataset<Row> df = spark
+                .readStream()
+                .format("kafka")
+                .option("kafka.bootstrap.servers", bootstrapServers)
+                .option("subscribe", "processed-stock-data")
+                .load();
 
-        JavaInputDStream<ConsumerRecord<String, String>> stream =
-                KafkaUtils.createDirectStream(
-                        jssc,
-                        LocationStrategies.PreferConsistent(),
-                        ConsumerStrategies.Subscribe(topics, kafkaParams)
+            // Convert the value column from binary to string
+            Dataset<Row> stockData = df.selectExpr("CAST(value AS STRING)");
+
+            // Define the schema for the JSON data
+            StructType schema = new StructType()
+                .add("symbol", DataTypes.StringType)
+                .add("open", DataTypes.DoubleType)
+                .add("high", DataTypes.DoubleType)
+                .add("low", DataTypes.DoubleType)
+                .add("close", DataTypes.DoubleType)
+                .add("volume", DataTypes.LongType)
+                .add("percent_change", DataTypes.DoubleType);
+
+            // Parse the JSON data
+            Dataset<Row> parsedData = stockData.select(functions.from_json(
+                stockData.col("value"),
+                schema
+            ).alias("data")).select("data.*");
+
+            // Perform some analysis
+            Dataset<Row> analysis = parsedData.groupBy("symbol")
+                .agg(
+                    functions.avg("percent_change").alias("avg_percent_change"),
+                    functions.max("high").alias("max_high"),
+                    functions.min("low").alias("min_low")
                 );
 
-        JavaDStream<String> lines = stream.map(ConsumerRecord::value);
+            // Write the results to console (for demonstration)
+            StreamingQuery query = analysis.writeStream()
+                .outputMode("complete")
+                .format("console")
+                .start();
 
-        lines.foreachRDD(rdd -> {
-            if (!rdd.isEmpty()) {
-                SparkSession spark = SparkSession.builder().config(rdd.context().getConf()).getOrCreate();
-                Dataset<Row> df = spark.read().json(rdd);
+            query.awaitTermination();
 
-                df.groupBy("symbol")
-                  .agg(org.apache.spark.sql.functions.avg("close").alias("average_close"))
-                  .write()
-                  .mode("append")
-                  .csv("output/stock_data");
-            }
-        });
-
-        jssc.start();
-        jssc.awaitTermination();
+        } catch (TimeoutException e) {
+            System.err.println("Timeout occurred: " + e.getMessage());
+        } catch (StreamingQueryException e) {
+            System.err.println("Streaming query exception: " + e.getMessage());
+        } finally {
+            spark.stop();
+        }
     }
 }
