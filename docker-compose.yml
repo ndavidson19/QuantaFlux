@@ -1,5 +1,7 @@
 version: '3'
 services:
+version: '3'
+services:
   zookeeper:
     image: wurstmeister/zookeeper
     ports:
@@ -14,6 +16,21 @@ services:
       KAFKA_LISTENERS: INSIDE://0.0.0.0:9093,OUTSIDE://0.0.0.0:9092
       KAFKA_INTER_BROKER_LISTENER_NAME: INSIDE
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_CREATE_TOPICS: "stock-data:1:1"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - zookeeper
+  kafka-manager:
+    image: hlebalbau/kafka-manager:stable
+    ports:
+      - "9000:9000"
+    environment:
+      ZK_HOSTS: "zookeeper:2181"
+      APPLICATION_SECRET: "random-secret"
+    depends_on:
+      - zookeeper
+      - kafka
   spark-master:
     image: bitnami/spark:3
     environment:
@@ -27,13 +44,13 @@ services:
       - SPARK_MASTER_URL=spark://spark-master:7077
     depends_on:
       - spark-master
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    environment:
-      - ALPHA_VANTAGE_API_KEY=${ALPHA_VANTAGE_API_KEY}
-    depends_on:
-      - kafka
-      - spark-master
-    command: java -jar /app/stock-etl.jar
+  #app:
+   # build:
+    #  context: .
+     # dockerfile: Dockerfile
+    #environment:
+     # - ALPHA_VANTAGE_API_KEY=${ALPHA_VANTAGE_API_KEY}
+    #depends_on:
+     # - kafka
+     # - spark-master
+    #command: java -jar /app/stock-etl.jar

@@ -5,6 +5,9 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.io.IOException;
+
+
 
 public class YahooFinanceSource implements StockDataSource {
     private static final String BASE_URL = "https://query1.finance.yahoo.com/v8/finance/chart/%s?interval=1d";
@@ -44,25 +47,11 @@ public class YahooFinanceSource implements StockDataSource {
             long volume = quote.getJSONArray("volume").getLong(0);
             double previousClose = meta.getDouble("chartPreviousClose");
 
-            System.out.println("Yahoo Finance data for " + symbol + ":\n" +
-                "Open: " + open + "\n" +
-                "High: " + high + "\n" +
-                "Low: " + low + "\n" +
-                "Price: " + price + "\n" +
-                "Volume: " + volume + "\n" +
-                "Previous Close: " + previousClose);
+            String stockData = String.format("Open: %.2f, High: %.2f, Low: %.2f, Price: %.2f, Volume: %d, Previous Close: %.2f", open, high, low, price, volume, previousClose);
 
-            return new JSONObject()
-                .put("symbol", meta.getString("symbol"))
-                .put("open", open)
-                .put("high", high)
-                .put("low", low)
-                .put("price", price)
-                .put("volume", volume)
-                .put("previousClose", previousClose)
-                .put("change", price - previousClose)
-                .put("changePercent", ((price - previousClose) / previousClose * 100))
-                .toString();
+            System.out.println("Yahoo Finance data for " + symbol + ":\n" + stockData);
+
+            return stockData;
 
         } catch (Exception e) {
             System.err.println("Error fetching data from Yahoo Finance for " + symbol + ": " + e.getMessage());

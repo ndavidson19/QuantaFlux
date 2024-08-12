@@ -43,7 +43,7 @@ public class App {
         executor.submit(() -> {
             try {
                 System.out.println("Starting Kafka Streams job...");
-                StockDataStreamsJob.main(new String[]{});
+                //StockDataStreamsJob.main(new String[]{});
             } catch (Exception e) {
                 System.err.println("Error in Kafka Streams job: " + e.getMessage());
                 e.printStackTrace();
@@ -54,7 +54,7 @@ public class App {
         executor.submit(() -> {
             try {
                 System.out.println("Starting Spark job...");
-                StockDataSparkJob.main(new String[]{});
+                // StockDataSparkJob.main(new String[]{});
             } catch (Exception e) {
                 System.err.println("Error in Spark job: " + e.getMessage());
                 e.printStackTrace();
