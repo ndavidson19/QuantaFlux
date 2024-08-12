@@ -26,11 +26,12 @@ public class StockDataStreamsJob {
 
         KStream<String, String> processedData = stockData.mapValues(value -> {
             JSONObject json = new JSONObject(value);
-            double open = json.getDouble("open");
-            double close = json.getDouble("close");
-            double percentChange = ((close - open) / open) * 100;
+            double price = json.getDouble("price");
+            double previousClose = json.getDouble("previousClose");
+            double changePercent = ((price - previousClose) / previousClose) * 100;
             
-            json.put("percent_change", String.format("%.2f", percentChange));
+            json.put("calculated_change_percent", String.format("%.2f", changePercent));
+            json.put("data_source", "alpha_vantage");
             return json.toString();
         });
 

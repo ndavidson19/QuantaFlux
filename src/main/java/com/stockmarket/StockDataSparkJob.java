@@ -38,9 +38,14 @@ public class StockDataSparkJob {
                 .add("open", DataTypes.DoubleType)
                 .add("high", DataTypes.DoubleType)
                 .add("low", DataTypes.DoubleType)
-                .add("close", DataTypes.DoubleType)
+                .add("price", DataTypes.DoubleType)
                 .add("volume", DataTypes.LongType)
-                .add("percent_change", DataTypes.DoubleType);
+                .add("latestTradingDay", DataTypes.StringType)
+                .add("previousClose", DataTypes.DoubleType)
+                .add("change", DataTypes.DoubleType)
+                .add("changePercent", DataTypes.StringType)
+                .add("calculated_change_percent", DataTypes.DoubleType)
+                .add("data_source", DataTypes.StringType);
 
             // Parse the JSON data
             Dataset<Row> parsedData = stockData.select(functions.from_json(
@@ -51,9 +56,12 @@ public class StockDataSparkJob {
             // Perform some analysis
             Dataset<Row> analysis = parsedData.groupBy("symbol")
                 .agg(
-                    functions.avg("percent_change").alias("avg_percent_change"),
+                    functions.avg("calculated_change_percent").alias("avg_change_percent"),
                     functions.max("high").alias("max_high"),
-                    functions.min("low").alias("min_low")
+                    functions.min("low").alias("min_low"),
+                    functions.avg("volume").alias("avg_volume"),
+                    functions.last("price").alias("latest_price"),
+                    functions.last("latestTradingDay").alias("latest_trading_day")
                 );
 
             // Write the results to console (for demonstration)

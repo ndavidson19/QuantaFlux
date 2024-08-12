@@ -14,11 +14,26 @@ services:
       KAFKA_LISTENERS: INSIDE://0.0.0.0:9093,OUTSIDE://0.0.0.0:9092
       KAFKA_INTER_BROKER_LISTENER_NAME: INSIDE
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
+  spark-master:
+    image: bitnami/spark:3
+    environment:
+      - SPARK_MODE=master
+    ports:
+      - "8080:8080"
+  spark-worker:
+    image: bitnami/spark:3
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+    depends_on:
+      - spark-master
   app:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - ALPHA_VANTAGE_API_KEY=${ALPHA_VANTAGE_API_KEY}
     depends_on:
       - kafka
-    environment:
-      KAFKA_BOOTSTRAP_SERVERS: kafka:9093
+      - spark-master
+    command: java -jar /app/stock-etl.jar
