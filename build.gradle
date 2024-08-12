@@ -13,34 +13,68 @@ repositories {
     mavenCentral()
 }
 
+tasks.register('showDependencyInsight') {
+    doLast {
+        configurations.runtimeClasspath.resolvedConfiguration.firstLevelModuleDependencies.each { dep ->
+            println("${dep.module.id}:${dep.resolvedVersion}")
+            dep.children.each { child ->
+                println("  ${child.module.id}:${child.resolvedVersion}")
+            }
+        }
+    }
+}
+
 ext {
-    kafkaVersion = '3.2.0'
+    scalaVersion = '2.13.8'
     sparkVersion = '3.5.1'
-    slf4jVersion = '2.0.9'
+    kafkaVersion = '3.2.0'
+    slf4jVersion = '1.7.32'
+    junitVersion = '5.10.0'
 }
 
 dependencies {
+    implementation "org.scala-lang:scala-library:${scalaVersion}"
+    
     implementation "org.apache.kafka:kafka-clients:${kafkaVersion}"
     implementation "org.apache.kafka:kafka-streams:${kafkaVersion}"
+    implementation "org.slf4j:slf4j-api:${slf4jVersion}"
+    implementation "org.slf4j:slf4j-simple:${slf4jVersion}"
+    
     implementation "org.apache.spark:spark-core_2.13:${sparkVersion}"
     implementation "org.apache.spark:spark-sql_2.13:${sparkVersion}"
     implementation "org.apache.spark:spark-streaming_2.13:${sparkVersion}"
-    implementation "org.apache.spark:spark-sql-kafka-0-10_2.13:${sparkVersion}"
-    implementation "org.slf4j:slf4j-api:${slf4jVersion}"
-    implementation "org.slf4j:slf4j-simple:${slf4jVersion}"
+    implementation("org.apache.spark:spark-streaming-kafka-0-10_2.13:${sparkVersion}") {
+        exclude group: 'org.apache.kafka'
+    }
+    implementation("org.apache.spark:spark-sql-kafka-0-10_2.13:${sparkVersion}") {
+        exclude group: 'org.apache.kafka'
+    }
+    
     implementation 'org.json:json:20210307'
     
-    testImplementation 'junit:junit:4.13.2'
+    testImplementation "org.junit.jupiter:junit-jupiter-api:${junitVersion}"
+    testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:${junitVersion}"
+    testImplementation "org.junit.jupiter:junit-jupiter-params:${junitVersion}"
+    testImplementation 'org.junit.vintage:junit-vintage-engine:5.10.0'
     testImplementation "org.apache.kafka:kafka-clients:${kafkaVersion}:test"
     testImplementation "org.apache.kafka:kafka_2.13:${kafkaVersion}:test"
-    testImplementation 'org.testcontainers:kafka:1.16.3'
-    testImplementation 'org.testcontainers:junit-jupiter:1.16.3'
 }
 
 test {
     useJUnitPlatform()
+    testLogging {
+        events "passed", "skipped", "failed"
+    }
 }
 
 application {
     mainClassName = 'com.stockmarket.App'
+}
+
+configurations.all {
+    resolutionStrategy {
+        force "org.apache.kafka:kafka-clients:${kafkaVersion}"
+        force "org.apache.kafka:kafka-streams:${kafkaVersion}"
+        force "org.apache.kafka:kafka_2.13:${kafkaVersion}"
+    }
 }
