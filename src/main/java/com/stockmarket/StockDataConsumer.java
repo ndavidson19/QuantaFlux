@@ -12,19 +12,20 @@ import java.util.Properties;
 
 public class StockDataConsumer {
     private static final String DEFAULT_BOOTSTRAP_SERVERS = "localhost:9092";
-    private static final String GROUP_ID = "stock-data-group";
-    private static final String TOPIC = "stock-data";
+    private static final String GROUP_ID_PREFIX = "stock-data-group";
     
     private final KafkaConsumer<String, String> consumer;
+    private final String topic;
 
-    public StockDataConsumer() {
-        this(DEFAULT_BOOTSTRAP_SERVERS);
+    public StockDataConsumer(String topic) {
+        this(DEFAULT_BOOTSTRAP_SERVERS, topic);
     }
 
-    public StockDataConsumer(String bootstrapServers) {
+    public StockDataConsumer(String bootstrapServers, String topic) {
+        this.topic = topic;
         Properties props = new Properties();
         props.put("bootstrap.servers", bootstrapServers);
-        props.put("group.id", GROUP_ID);
+        props.put("group.id", GROUP_ID_PREFIX + "-" + topic);
         props.put("key.deserializer", StringDeserializer.class.getName());
         props.put("value.deserializer", StringDeserializer.class.getName());
         props.put("auto.offset.reset", "earliest");
@@ -33,11 +34,11 @@ public class StockDataConsumer {
     }
 
     public void subscribe() {
-        this.consumer.subscribe(Collections.singletonList(TOPIC));
+        this.consumer.subscribe(Collections.singletonList(topic));
     }
 
     public void assignToPartition(int partition) {
-        TopicPartition topicPartition = new TopicPartition(TOPIC, partition);
+        TopicPartition topicPartition = new TopicPartition(topic, partition);
         this.consumer.assign(Collections.singletonList(topicPartition));
         this.consumer.seekToBeginning(Collections.singletonList(topicPartition));
     }

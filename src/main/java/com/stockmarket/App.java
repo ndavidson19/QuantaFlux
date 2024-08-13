@@ -1,5 +1,8 @@
 package com.stockmarket;
 
+import com.stockmarket.strategies.*;
+import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -8,36 +11,111 @@ public class App {
     private static final int PRODUCER_INTERVAL_MS = 60000; // 1 minute
 
     public static void main(String[] args) {
-        ExecutorService executor = Executors.newFixedThreadPool(4);
 
-        // Start the producer
+    ExecutorService executor = Executors.newFixedThreadPool(6); // Increased to 5 for the new StrategyProducer
+
+        // Start the raw data producer
         executor.submit(() -> {
             try {
-                System.out.println("Starting producer...");
+                System.out.println("Starting raw data producer...");
                 StockDataProducer producer = new StockDataProducer();
-                
                 while (!Thread.currentThread().isInterrupted()) {
-                    // Use default source (Yahoo Finance)
-                    producer.sendMessage();
-                    
-                    // Or specify a source
-                    // producer.sendMessage("alphavantage");
-                    
-                    // Or change the default source
-                    // producer.setDefaultSource("alphavantage");
-                    // producer.sendMessage();
-                    
+                    producer.produceData();
                     System.out.println("Producer completed a round of messages");
-                    Thread.sleep(PRODUCER_INTERVAL_MS);  // Wait for 1 minute before next round
+                    Thread.sleep(PRODUCER_INTERVAL_MS);
                 }
             } catch (InterruptedException e) {
-                System.out.println("Producer interrupted");
+                System.out.println("Raw data producer interrupted");
                 Thread.currentThread().interrupt();
             } catch (Exception e) {
-                System.err.println("Error in producer: " + e.getMessage());
+                System.err.println("Error in raw data producer: " + e.getMessage());
                 e.printStackTrace();
             }
-            });
+        });
+
+        // Start the ProcessedDataProducer
+        executor.submit(() -> {
+            try {
+                System.out.println("Starting processed data producer...");
+                ProcessedDataProducer processedProducer = new ProcessedDataProducer();
+                processedProducer.processData();
+            } catch (Exception e) {
+                System.err.println("Error in processed data producer: " + e.getMessage());
+                e.printStackTrace();
+            }
+        });
+
+        // Start the StrategyProducer
+        executor.submit(() -> {
+            try {
+                System.out.println("Starting strategy producer...");
+                List<TradingStrategy> strategies = Arrays.asList(
+                    new MovingAverageCrossoverStrategy(10, 30)
+                    // Add more strategies here as needed
+                );
+                StrategyProducer strategyProducer = new StrategyProducer(strategies);
+                strategyProducer.processData();
+            } catch (Exception e) {
+                System.err.println("Error in strategy producer: " + e.getMessage());
+                e.printStackTrace();
+            }
+        });
+
+        // Start the consumer for raw data
+        executor.submit(() -> {
+            try {
+                System.out.println("Starting raw data consumer...");
+                StockDataConsumer consumer = new StockDataConsumer("raw-stock-data");
+                consumer.subscribe();
+                while (!Thread.currentThread().isInterrupted()) {
+                    String message = consumer.receiveMessage();
+                    if (message != null) {
+                        System.out.println("Received raw data: " + message);
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println("Error in raw data consumer: " + e.getMessage());
+                e.printStackTrace();
+            }
+        });
+
+        // Start the consumer for processed data
+        executor.submit(() -> {
+            try {
+                System.out.println("Starting processed data consumer...");
+                StockDataConsumer consumer = new StockDataConsumer("processed-stock-data");
+                consumer.subscribe();
+                while (!Thread.currentThread().isInterrupted()) {
+                    String message = consumer.receiveMessage();
+                    if (message != null) {
+                        System.out.println("Received processed data: " + message);
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println("Error in processed data consumer: " + e.getMessage());
+                e.printStackTrace();
+            }
+        });
+
+
+        // Start the consumer for strategy signals
+        executor.submit(() -> {
+            try {
+                System.out.println("Starting strategy signal consumer...");
+                StockDataConsumer consumer = new StockDataConsumer("MovingAverageCrossover-signals");
+                consumer.subscribe();
+                while (!Thread.currentThread().isInterrupted()) {
+                    String message = consumer.receiveMessage();
+                    if (message != null) {
+                        System.out.println("Received strategy signal: " + message);
+                        // Here you would typically act on the strategy signal
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println("Error in strategy signal consumer: " + e.getMessage());
+                e.printStackTrace();
+            }
+        });
 
         // Start the Kafka Streams job
         executor.submit(() -> {
@@ -58,31 +136,6 @@ public class App {
             } catch (Exception e) {
                 System.err.println("Error in Spark job: " + e.getMessage());
                 e.printStackTrace();
-            }
-        });
-
-        // Start the consumer
-        executor.submit(() -> {
-            try {
-                System.out.println("Starting consumer...");
-                StockDataConsumer consumer = new StockDataConsumer();
-                consumer.subscribe();
-                while (!Thread.currentThread().isInterrupted()) {
-                    try {
-                        String message = consumer.receiveMessage();
-                        if (message != null) {
-                            System.out.println("Received: " + message);
-                        }
-                    } catch (Exception e) {
-                        System.err.println("Error in consumer while receiving message: " + e.getMessage());
-                        e.printStackTrace();
-                    }
-                }
-            } catch (Exception e) {
-                System.err.println("Error in consumer setup: " + e.getMessage());
-                e.printStackTrace();
-            } finally {
-                System.out.println("Consumer shutting down");
             }
         });
 
