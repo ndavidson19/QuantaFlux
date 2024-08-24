@@ -1,7 +1,5 @@
 version: '3'
 services:
-version: '3'
-services:
   zookeeper:
     image: wurstmeister/zookeeper
     ports:

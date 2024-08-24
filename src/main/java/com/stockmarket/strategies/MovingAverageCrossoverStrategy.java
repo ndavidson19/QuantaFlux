@@ -1,6 +1,8 @@
 package com.stockmarket.strategies;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
+
 import java.util.LinkedList;
 import java.util.Queue;
 
@@ -43,7 +45,7 @@ public class MovingAverageCrossoverStrategy extends AbstractStrategy {
     @Override
     public void updateState(String symbol, JSONObject data) {
         JSONObject state = getState(symbol);
-        double price = data.getDouble("price");  // Changed from "close" to "price"
+        double price = data.getDouble("price");
 
         updateQueue(getQueue(state, "shortTerm", shortTermPeriod), price);
         updateQueue(getQueue(state, "longTerm", longTermPeriod), price);
@@ -52,20 +54,42 @@ public class MovingAverageCrossoverStrategy extends AbstractStrategy {
     }
 
     private Queue<Double> getQueue(JSONObject state, String key, int maxSize) {
+        Queue<Double> queue;
+
         if (!state.has(key)) {
-            state.put(key, new JSONObject().put("queue", new LinkedList<Double>()).put("maxSize", maxSize));
+            queue = new LinkedList<>();
+            state.put(key, new JSONArray());
+        } else {
+            queue = jsonArrayToQueue(state.getJSONArray(key));
         }
-        return (Queue<Double>) state.getJSONObject(key).get("queue");
+
+        return queue;
     }
 
     private void updateQueue(Queue<Double> queue, double price) {
         queue.offer(price);
-        if (queue.size() > queue.size()) {
+        if (queue.size() > shortTermPeriod) {
             queue.poll();
         }
     }
 
     private double calculateAverage(Queue<Double> queue) {
         return queue.stream().mapToDouble(Double::doubleValue).average().orElse(0.0);
+    }
+
+    private Queue<Double> jsonArrayToQueue(JSONArray jsonArray) {
+        Queue<Double> queue = new LinkedList<>();
+        for (int i = 0; i < jsonArray.length(); i++) {
+            queue.add(jsonArray.getDouble(i));
+        }
+        return queue;
+    }
+
+    private JSONArray queueToJsonArray(Queue<Double> queue) {
+        JSONArray jsonArray = new JSONArray();
+        for (Double value : queue) {
+            jsonArray.put(value);
+        }
+        return jsonArray;
     }
 }
