@@ -12,7 +12,7 @@ public class App {
 
     public static void main(String[] args) {
 
-    ExecutorService executor = Executors.newFixedThreadPool(6); // Increased to 5 for the new StrategyProducer
+    ExecutorService executor = Executors.newFixedThreadPool(7); // Increased to 5 for the new StrategyProducer
 
         // Start the raw data producer
         executor.submit(() -> {
@@ -55,6 +55,7 @@ public class App {
                 );
                 StrategyProducer strategyProducer = new StrategyProducer(strategies);
                 strategyProducer.processData();
+                System.out.println("Strategy producer completed a round of messages");
             } catch (Exception e) {
                 System.err.println("Error in strategy producer: " + e.getMessage());
                 e.printStackTrace();
@@ -121,7 +122,7 @@ public class App {
         executor.submit(() -> {
             try {
                 System.out.println("Starting Kafka Streams job...");
-                //StockDataStreamsJob.main(new String[]{});
+                StockDataStreamsJob.main(new String[]{});
             } catch (Exception e) {
                 System.err.println("Error in Kafka Streams job: " + e.getMessage());
                 e.printStackTrace();
