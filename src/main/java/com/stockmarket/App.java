@@ -1,18 +1,23 @@
 package com.stockmarket;
 
 import com.stockmarket.strategies.*;
+
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.time.Duration;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 
 public class App {
     private static final int PRODUCER_INTERVAL_MS = 60000; // 1 minute
 
     public static void main(String[] args) {
 
-    ExecutorService executor = Executors.newFixedThreadPool(7); // Increased to 5 for the new StrategyProducer
+    ExecutorService executor = Executors.newFixedThreadPool(8); // Increased to 5 for the new StrategyProducer
 
         // Start the raw data producer
         executor.submit(() -> {
@@ -66,12 +71,12 @@ public class App {
         executor.submit(() -> {
             try {
                 System.out.println("Starting raw data consumer...");
-                StockDataConsumer consumer = new StockDataConsumer("raw-stock-data");
-                consumer.subscribe();
+                StockDataConsumer consumer = new StockDataConsumer("raw-stock-data", 10); // Assume 10 partitions
+                consumer.subscribeToAll();
                 while (!Thread.currentThread().isInterrupted()) {
-                    String message = consumer.receiveMessage();
-                    if (message != null) {
-                        System.out.println("Received raw data: " + message);
+                    List<ConsumerRecord<String, String>> messages = consumer.receiveMessages(Duration.ofMillis(100));
+                    for (ConsumerRecord<String, String> record : messages) {
+                        System.out.println("Received raw data: " + record.key() + " - " + record.value());
                     }
                 }
             } catch (Exception e) {
@@ -84,12 +89,12 @@ public class App {
         executor.submit(() -> {
             try {
                 System.out.println("Starting processed data consumer...");
-                StockDataConsumer consumer = new StockDataConsumer("processed-stock-data");
-                consumer.subscribe();
+                StockDataConsumer consumer = new StockDataConsumer("processed-stock-data", 10); // Assume 10 partitions
+                consumer.subscribeToAll();
                 while (!Thread.currentThread().isInterrupted()) {
-                    String message = consumer.receiveMessage();
-                    if (message != null) {
-                        System.out.println("Received processed data: " + message);
+                    List<ConsumerRecord<String, String>> messages = consumer.receiveMessages(Duration.ofMillis(100));
+                    for (ConsumerRecord<String, String> record : messages) {
+                        System.out.println("Received processed data: " + record.key() + " - " + record.value());
                     }
                 }
             } catch (Exception e) {
@@ -98,22 +103,45 @@ public class App {
             }
         });
 
-
         // Start the consumer for strategy signals
         executor.submit(() -> {
             try {
                 System.out.println("Starting strategy signal consumer...");
-                StockDataConsumer consumer = new StockDataConsumer("MovingAverageCrossover-signals");
-                consumer.subscribe();
+                StockDataConsumer consumer = new StockDataConsumer("MovingAverageCrossover-signals", 1); // Assume 1 partition
+                consumer.subscribeToAll();
                 while (!Thread.currentThread().isInterrupted()) {
-                    String message = consumer.receiveMessage();
-                    if (message != null) {
-                        System.out.println("Received strategy signal: " + message);
+                    List<ConsumerRecord<String, String>> messages = consumer.receiveMessages(Duration.ofMillis(100));
+                    for (ConsumerRecord<String, String> record : messages) {
+                        System.out.println("Received strategy signal: " + record.key() + " - " + record.value());
                         // Here you would typically act on the strategy signal
                     }
                 }
             } catch (Exception e) {
                 System.err.println("Error in strategy signal consumer: " + e.getMessage());
+                e.printStackTrace();
+            }
+        });
+
+        // Start the consumer for AAPL stock
+        executor.submit(() -> {
+            try {
+                System.out.println("Starting consumer for AAPL stock...");
+                int totalPartitions = 10; // Make sure this matches your topic configuration
+                StockDataConsumer consumer = new StockDataConsumer("processed-stock-data", totalPartitions);
+                int aaplPartition = StockPartitioner.getPartitionForStock("AAPL", totalPartitions);
+                consumer.assignToPartition(aaplPartition);
+                System.out.println("AAPL consumer assigned to partition: " + aaplPartition);
+                
+                while (!Thread.currentThread().isInterrupted()) {
+                    List<ConsumerRecord<String, String>> messages = consumer.receiveMessages(Duration.ofMillis(100));
+                    for (ConsumerRecord<String, String> record : messages) {
+                        if ("AAPL".equals(record.key())) {
+                            System.out.println("Received AAPL data: " + record.key() + " - " + record.value());
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println("Error in AAPL stock consumer: " + e.getMessage());
                 e.printStackTrace();
             }
         });
